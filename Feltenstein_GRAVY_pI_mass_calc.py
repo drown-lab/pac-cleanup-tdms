@@ -2,7 +2,7 @@ import pandas as pd
 from Bio.SeqUtils.ProtParam import ProteinAnalysis
 
 # Load the Excel file (fix path issue with raw strings or forward slashes)
-file_path = r'C:\Pycharm_Projects\20250722_HitReport_NoHistones.csv'  # Corrected file path
+file_path = r'C:\Pycharm_Projects\name_of_your_document.csv'  # Corrected file path, change "name_of_your_document" to your document name
 df = pd.read_csv(file_path)
 
 # Function to calculate properties
