@@ -20,7 +20,7 @@ df[['GRAVY', 'Isoelectric Point', 'Aromaticity', 'Instability']] = df['Sequence'
 )
 
 # Save the updated DataFrame to a new Excel file (ensure output file path is correct)
-output_file_path = r'C:\Pycharm_Projects\20250722_HitReport_NoHistones_finished.csv'  # Corrected file path
+output_file_path = r'C:\Pycharm_Projects\name_of_your_document_finished.csv'  # Corrected file path, adding "finished" to end of document name to distinguish the two
 df.to_csv(output_file_path, index=False)
 
 print("Calculations completed and saved to the new Excel file.")
