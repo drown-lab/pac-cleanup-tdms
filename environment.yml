@@ -1,0 +1,13 @@
+name: tdms
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.12
+  - matplotlib
+  - matplotlib-venn
+  - numpy
+  - pandas
+  - seaborn
+  - scipy
+  - biopython
