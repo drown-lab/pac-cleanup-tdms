@@ -1,0 +1,12 @@
+Name,Cleanup,Resuspension,Include
+20250721_ifeltens_2_Cyt.raw,Cytiva Carboxyl,2% TFA,TRUE
+20250721_ifeltens_2_Hyd.raw,MagReSyn Hydroxyl,2% TFA,TRUE
+20250721_ifeltens_10_Cyt.raw,Cytiva Carboxyl,10% FA,TRUE
+20250721_ifeltens_10_Hyd.raw,MagReSyn Hydroxyl,10% FA,TRUE
+20250721_ifeltens_20_Cyt.raw,Cytiva Carboxyl,20% FA,TRUE
+20250721_ifeltens_20_Hyd.raw,MagReSyn Hydroxyl,20% FA,TRUE
+20250721_ifeltens_MCW.raw,MCW,"5% ACN, 0.1% FA",TRUE
+20250722_ifeltens_05_Cyt_20250722214601.raw,Cytiva Carboxyl,0.5% TFA,FALSE
+20250722_ifeltens_05_Cyt_20250723000549.raw,Cytiva Carboxyl,0.5% TFA,TRUE
+20250722_ifeltens_05_Hyd_20250722225533.raw,MagReSyn Hydroxyl,0.5% TFA,FALSE
+20250722_ifeltens_05_Hyd_20250723011525.raw,MagReSyn Hydroxyl,0.5% TFA,TRUE
