@@ -12,7 +12,7 @@ There are two independent scripts:
 
 | Script | Purpose |
 | ------ | ------- |
-| `Feltenstein_GRAVY_pI_mass_calc.py` | Calculate biochemical properties (GRAVY, pI, aromaticity, instability) for a list of protein sequences. |
+| `proteoform_physiochemical_props.py` | Calculate biochemical properties (GRAVY, pI, aromaticity, instability) for a list of protein sequences. |
 | `shared_proteoforms.py` | Compare identification scores of proteoforms shared across sample-cleanup conditions from a ProSightPD `.tdReport`. |
 
 ---
@@ -30,7 +30,7 @@ conda activate tdms
 
 ---
 
-## Script 1 — `Feltenstein_GRAVY_pI_mass_calc.py`
+## Script 1 — `proteoform_physiochemical_props.py`
 
 Reads a CSV file of protein sequences, calculates several biochemical properties
 for each sequence using Biopython, and writes the results to a new CSV file.
@@ -89,7 +89,7 @@ output_file_path = r'C:\Pycharm_Projects\name_of_your_document_finished.csv'
 ### Running
 
 ```bash
-python Feltenstein_GRAVY_pI_mass_calc.py
+conda run -n tdms python proteoform_physiochemical_props.py
 ```
 
 On completion the script prints a confirmation message and writes the
