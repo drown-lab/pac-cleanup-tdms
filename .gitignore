@@ -21,3 +21,11 @@ env/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Figures
+*.png
+*.pdf
+
+# Results tables
+*.csv
+*.tsv
