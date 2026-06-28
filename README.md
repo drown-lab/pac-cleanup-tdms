@@ -8,18 +8,54 @@ sample-cleanup approach for **t**op-**d**own **p**roteomics (TDP). The code
 accompanies the associated publication and is provided as-is to make the
 analysis reproducible.
 
-The repository contains several independent scripts:
+## Repository layout
+
+```
+.
+├── config/
+│   └── experimental_design.csv     # sample → cleanup/resuspension/include map
+├── data/                           # all inputs — git-ignored; see data/README.md
+│   ├── raw/  mzML/  flashdeconv/
+│   └── *.tdReport
+├── src/
+│   ├── deconvolution/              # FLASHDeconv mass deconvolution
+│   ├── modifications/              # MSTopDiff Δmass modification analysis
+│   └── identification/             # ProSightPD .tdReport identifications
+└── results/
+    ├── figures/                    # publication figures (.pdf + .png), tracked
+    └── tables/                     # summary/stat tables (bulky dumps git-ignored)
+```
+
+The code is grouped into three independent analysis pipelines under `src/`:
+
+**`src/deconvolution/`** — FLASHDeconv mass deconvolution
+
+| Script | Purpose |
+| ------ | ------- |
+| `run_FLASHDeconv.ps1`, `run_FLASHDeconv_parallel.ps1` | Run FLASHDeconv over a folder of mzML (serial / one-thread-per-file parallel). |
+| `flashdeconv_summary.py` | Summarize FLASHDeconv deconvolution-FDR output (confident-mass yield, Qscore distributions) across spectrum-level `*_ms1.tsv` files. |
+| `filter_features.py` | Filter FLASHDeconv feature TSVs to confident masses (drop decoys, q-value ≤ 5%, ≥3 charge states) for re-running MSTopDiff. |
+
+**`src/modifications/`** — MSTopDiff Δmass modification analysis
+
+| Script | Purpose |
+| ------ | ------- |
+| `mstopdiff_compare.py` | Build the MSTopDiff Δmass modification figures (per-condition intensity×count histograms, relative-abundance bars and heatmap). |
+| `mstopdiff_unannotated.py` | Classify detected Δmass peaks as known / off-by-one satellite / isotope / unannotated and quantify the unexplained fraction. |
+| `mstopdiff_config.py` | Shared dataset registry (auto-discovers MSTopDiff exports, labels/colours them from `config/experimental_design.csv`); imported by the two scripts above. |
+
+**`src/identification/`** — ProSightPD `.tdReport` identifications
 
 | Script | Purpose |
 | ------ | ------- |
 | `proteoform_physiochemical_props.py` | Calculate biochemical properties (GRAVY, pI, aromaticity, instability) for FDR-confident proteoforms pulled directly from a ProSightPD `.tdReport`, labeled by cleanup condition. |
 | `physiochemical_stats.py` | Test whether the physiochemical property distributions (mass, pI, GRAVY) vary by cleanup method — by bead type and by condition — with effect sizes (shares the data pipeline of `proteoform_physiochemical_props.py`). |
 | `shared_proteoforms.py` | Compare identification scores of proteoforms shared across sample-cleanup conditions from a ProSightPD `.tdReport`. |
-| `flashdeconv_summary.py` | Summarize FLASHDeconv deconvolution-FDR output (confident-mass yield, Qscore distributions) across spectrum-level `*_ms1.tsv` files. |
-| `filter_features.py` | Filter FLASHDeconv feature TSVs to confident masses (drop decoys, q-value ≤ 5%, ≥3 charge states) for re-running MSTopDiff. |
-| `mstopdiff_compare.py` | Build the MSTopDiff Δmass modification figures (per-condition intensity×count histograms, relative-abundance bars and heatmap). |
-| `mstopdiff_unannotated.py` | Classify detected Δmass peaks as known / off-by-one satellite / isotope / unannotated and quantify the unexplained fraction. |
-| `mstopdiff_config.py` | Shared dataset registry (auto-discovers MSTopDiff exports, labels/colours them from `experimental_design.csv`); imported by the two scripts above. |
+
+Each script reads inputs from `data/` and `config/` and writes figures/tables to
+`results/`, resolved relative to the repository root, so they can be run from
+anywhere. Inputs (raw data and the `.tdReport`) are not included — see
+[`data/README.md`](data/README.md).
 
 ---
 
@@ -69,12 +105,12 @@ starts with "Histone" — which excludes "Non-histone chromosomal protein HMG-�
 
 ### Inputs
 
-Both inputs must sit in the same directory as the script:
+The two inputs (paths relative to the repository root):
 
 | File | Description |
 | ---- | ----------- |
-| `20250723_ifeltens_SP3_TDP_annotated_subsequence_2.tdReport` | ProSightPD report (SQLite); source of proteoform sequences and masses. **Not included in the repository** — supply your own. |
-| `experimental_design.csv` | Maps each raw file to its `Cleanup` / `Resuspension` condition and an `Include` flag. |
+| `data/20250723_ifeltens_SP3_TDP_annotated_subsequence_2.tdReport` | ProSightPD report (SQLite); source of proteoform sequences and masses. **Not included in the repository** — supply your own. |
+| `config/experimental_design.csv` | Maps each raw file to its `Cleanup` / `Resuspension` condition and an `Include` flag. |
 
 Selection mirrors `shared_proteoforms.py`:
 
@@ -86,7 +122,7 @@ Selection mirrors `shared_proteoforms.py`:
 
 ### Outputs
 
-Written next to the script:
+Written to `results/` (figures to `results/figures/`, tables to `results/tables/`):
 
 | File | Description |
 | ---- | ----------- |
@@ -104,7 +140,7 @@ prints per-condition summary statistics to the console.
 ### Running
 
 ```bash
-conda run -n tdms python proteoform_physiochemical_props.py
+conda run -n tdms python src/identification/proteoform_physiochemical_props.py
 ```
 
 ---
@@ -141,7 +177,7 @@ grouping × subset × property family.
 ### Running
 
 ```bash
-conda run -n tdms python physiochemical_stats.py
+conda run -n tdms python src/identification/physiochemical_stats.py
 ```
 
 ---
@@ -170,12 +206,12 @@ Key analysis decisions (see the module docstring for details):
 
 ### Inputs
 
-Both inputs must sit in the same directory as the script:
+The two inputs (paths relative to the repository root):
 
 | File | Description |
 | ---- | ----------- |
-| `20250721_ifeltens_BEC_Consensus.tdReport` | ProSightPD consensus report (SQLite). **Not included in the repository** — supply your own. |
-| `experimental_design.csv` | Maps each raw file to its `Cleanup` / `Resuspension` condition and an `Include` flag. |
+| `data/20250723_ifeltens_SP3_TDP_annotated_subsequence_2.tdReport` | ProSightPD report (SQLite). **Not included in the repository** — supply your own. |
+| `config/experimental_design.csv` | Maps each raw file to its `Cleanup` / `Resuspension` condition and an `Include` flag. |
 
 `experimental_design.csv` has columns `Name, Cleanup, Resuspension, Include`. Rows
 with `Include == FALSE` (e.g. files acquired with a different method) are dropped.
@@ -185,7 +221,7 @@ script.
 
 ### Outputs
 
-Written next to the script:
+Written to `results/` (figures to `results/figures/`, tables to `results/tables/`):
 
 | File | Description |
 | ---- | ----------- |
@@ -205,7 +241,7 @@ proteoforms.
 ### Running
 
 ```bash
-conda run -n tdms python shared_proteoforms.py
+conda run -n tdms python src/identification/shared_proteoforms.py
 ```
 
 ---
@@ -249,13 +285,13 @@ envelopes), so confidence must come from the q-value.
 * keep feature q-value ≤ `FDR_THRESH` (default 0.05)
 * keep `ChargeCount ≥ MIN_CHARGE_STATES` (default 3)
 
-Output: `flashdeconv/filtered/<stem>_conf.tsv` (same columns/format). Re-run
+Output: `data/flashdeconv/filtered/<stem>_conf.tsv` (same columns/format). Re-run
 MSTopDiff (GUI; no CLI) on these and place the resulting
-`<stem>_conf_mstopdiff.csv` into `flashdeconv/mstopdiff/`.
+`<stem>_conf_mstopdiff.csv` into `data/flashdeconv/mstopdiff/`.
 
 ### Dataset registry (`mstopdiff_config.py`)
 
-Auto-discovers every `flashdeconv/mstopdiff/*_conf_mstopdiff.csv`, then labels,
+Auto-discovers every `data/flashdeconv/mstopdiff/*_conf_mstopdiff.csv`, then labels,
 colours and orders each dataset from `experimental_design.csv` (MCW = green,
 Cytiva = blues, MagReSyn = reds, shaded by resuspension), flagging the three
 publication datasets (MCW, Cytiva 0.5 % TFA, MagReSyn 0.5 % TFA). Both analysis
@@ -289,10 +325,10 @@ unexplained fraction (with a threshold sensitivity sweep). Outputs
 ### Running
 
 ```bash
-conda run -n tdms python filter_features.py        # write confident _conf.tsv
-# (re-run MSTopDiff on flashdeconv/filtered/*_conf.tsv -> flashdeconv/mstopdiff/)
-conda run -n tdms python mstopdiff_compare.py
-conda run -n tdms python mstopdiff_unannotated.py
+conda run -n tdms python src/deconvolution/filter_features.py        # write confident _conf.tsv
+# (re-run MSTopDiff on data/flashdeconv/filtered/*_conf.tsv -> data/flashdeconv/mstopdiff/)
+conda run -n tdms python src/modifications/mstopdiff_compare.py
+conda run -n tdms python src/modifications/mstopdiff_unannotated.py
 ```
 
 ---

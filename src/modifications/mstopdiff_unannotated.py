@@ -35,7 +35,10 @@ plt.rcParams["font.size"] = 13
 
 import mstopdiff_config as cfg
 
-HERE = os.path.dirname(os.path.abspath(__file__))
+FIGURES_DIR = cfg.FIGURES_DIR  # results/figures
+TABLES_DIR = cfg.TABLES_DIR    # results/tables
+os.makedirs(FIGURES_DIR, exist_ok=True)
+os.makedirs(TABLES_DIR, exist_ok=True)
 
 # Known single modification masses (Da). Same curated list as the figure script.
 MOD_MASSES = [
@@ -193,12 +196,12 @@ def main():
         una["condition"] = cond
         all_unannot.append(una)
     summ = pd.DataFrame(summ_rows)
-    summ.to_csv(os.path.join(HERE, "mstopdiff_unannotated_summary.csv"),
+    summ.to_csv(os.path.join(TABLES_DIR, "mstopdiff_unannotated_summary.csv"),
                 index=False)
     unannot = pd.concat(all_unannot, ignore_index=True)[
         ["condition", "mass", "rel", "ixc"]].sort_values(
             ["condition", "ixc"], ascending=[True, False])
-    unannot.to_csv(os.path.join(HERE, "mstopdiff_unannotated_peaks.csv"),
+    unannot.to_csv(os.path.join(TABLES_DIR, "mstopdiff_unannotated_peaks.csv"),
                    index=False)
 
     # ---- sensitivity sweep over the relative-abundance threshold ----
@@ -213,7 +216,7 @@ def main():
                               "frac_unannot_by_count": row["frac_unannot_by_count"],
                               "frac_unannot_by_ixc": row["frac_unannot_by_ixc"]})
     sweep = pd.DataFrame(sweep)
-    sweep.to_csv(os.path.join(HERE, "mstopdiff_unannotated_sensitivity.csv"),
+    sweep.to_csv(os.path.join(TABLES_DIR, "mstopdiff_unannotated_sensitivity.csv"),
                  index=False)
 
     # ---- composition figure: intensity x count split by class ----
@@ -249,7 +252,7 @@ def main():
                  f"(peaks >= {REL_THRESH:.0%} of base peak)", fontsize=12)
     fig.tight_layout(rect=[0, 0, 1, 0.95])
     for ext in ("png", "pdf"):
-        fig.savefig(os.path.join(HERE, f"fig_mstopdiff_unannotated.{ext}"),
+        fig.savefig(os.path.join(FIGURES_DIR, f"fig_mstopdiff_unannotated.{ext}"),
                     dpi=200, bbox_inches="tight")
 
     # ---- console ----

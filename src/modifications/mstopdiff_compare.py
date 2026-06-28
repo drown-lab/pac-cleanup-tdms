@@ -44,7 +44,10 @@ plt.rcParams["axes.unicode_minus"] = False
 plt.rcParams["font.size"] = 13
 
 XMAX = 90  # delta-mass axis upper limit (Da)
-HERE = os.path.dirname(os.path.abspath(__file__))
+FIGURES_DIR = cfg.FIGURES_DIR  # results/figures
+TABLES_DIR = cfg.TABLES_DIR    # results/tables
+os.makedirs(FIGURES_DIR, exist_ok=True)
+os.makedirs(TABLES_DIR, exist_ok=True)
 
 # Curated common top-down delta masses (monoisotopic, Da): biological PTMs and
 # the artifacts/adducts MSTopDiff is designed to surface.
@@ -172,7 +175,7 @@ def stacked_figure(dsets, outname, height_per=3.4):
                  "(confident masses, 0-60 min, rebinned to 0.1 Da)", fontsize=14)
     fig.tight_layout(rect=[0, 0, 1, 0.97])
     for ext in ("png", "pdf"):
-        fig.savefig(os.path.join(HERE, f"{outname}.{ext}"),
+        fig.savefig(os.path.join(FIGURES_DIR, f"{outname}.{ext}"),
                     dpi=200, bbox_inches="tight")
     plt.close(fig)
 
@@ -196,7 +199,7 @@ def main():
             row[f"{d['label']}|ixc_rel"] = round(rel, 4)
         rows.append(row)
     table = pd.DataFrame(rows)
-    table.to_csv(os.path.join(HERE, "mstopdiff_mod_table.csv"), index=False)
+    table.to_csv(os.path.join(TABLES_DIR, "mstopdiff_mod_table.csv"), index=False)
 
     # ---------- stacked histograms: publication subset + all datasets ----------
     pub = [d for d in dsets if d["is_pub"]]
@@ -223,7 +226,7 @@ def main():
         ax.legend(fontsize=8, loc="lower right")
         fig2.tight_layout()
         for ext in ("png", "pdf"):
-            fig2.savefig(os.path.join(HERE, f"fig_mstopdiff_mod_enrichment.{ext}"),
+            fig2.savefig(os.path.join(FIGURES_DIR, f"fig_mstopdiff_mod_enrichment.{ext}"),
                          dpi=200, bbox_inches="tight")
         plt.close(fig2)
 
@@ -247,7 +250,7 @@ def main():
     ax.set_title("Modification relative abundance across all datasets")
     fig3.tight_layout()
     for ext in ("png", "pdf"):
-        fig3.savefig(os.path.join(HERE, f"fig_mstopdiff_mod_heatmap.{ext}"),
+        fig3.savefig(os.path.join(FIGURES_DIR, f"fig_mstopdiff_mod_heatmap.{ext}"),
                      dpi=200, bbox_inches="tight")
     plt.close(fig3)
 

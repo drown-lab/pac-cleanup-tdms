@@ -42,7 +42,7 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
-from proteoform_physiochemical_props import DB, HERE, load_dataset
+from proteoform_physiochemical_props import DB, TABLES_DIR, load_dataset
 
 # Properties tested (the three drawn in the figure).
 PROPERTIES = [
@@ -161,8 +161,9 @@ def main() -> None:
 
     omni = pd.DataFrame(omni_rows)
     pair = pd.DataFrame(pair_rows)
-    omni.to_csv(HERE / "physiochemical_stats_omnibus.csv", index=False)
-    pair.to_csv(HERE / "physiochemical_stats_pairwise.csv", index=False)
+    TABLES_DIR.mkdir(parents=True, exist_ok=True)
+    omni.to_csv(TABLES_DIR / "physiochemical_stats_omnibus.csv", index=False)
+    pair.to_csv(TABLES_DIR / "physiochemical_stats_pairwise.csv", index=False)
 
     # ---- console report -----------------------------------------------------
     pd.set_option("display.width", 200)
