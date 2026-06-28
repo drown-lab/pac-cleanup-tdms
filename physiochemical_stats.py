@@ -18,10 +18,10 @@ IMPORTANT caveat: a proteoform's property value is a FIXED attribute of its
 sequence; methods differ only in WHICH proteoforms they detect, and the detected
 sets overlap heavily. So observations across groups are NOT independent and these
 tests are descriptive. With several hundred per group, p-values get tiny for even
-trivial differences -- read the EFFECT SIZES (epsilon^2, Cliff's delta), not p.
+trivial differences -- read the EFFECT SIZES (eta^2, Cliff's delta), not p.
 
 Tests (scipy only):
-  - Kruskal-Wallis omnibus across groups, with epsilon^2 effect size
+  - Kruskal-Wallis omnibus across groups, with eta-squared effect size
   - pairwise Mann-Whitney U (two-sided) with Cliff's delta effect size
   - pairwise two-sample Kolmogorov-Smirnov (distribution shape, sensitive to the
     bimodality of pI)
@@ -63,8 +63,8 @@ def delta_magnitude(d: float) -> str:
     return "large"
 
 
-def epsilon_squared(H: float, n: int, k: int) -> float:
-    """Epsilon-squared effect size for Kruskal-Wallis (Tomczak & Tomczak 2014)."""
+def eta_squared(H: float, n: int, k: int) -> float:
+    """Eta-squared (from H) effect size for Kruskal-Wallis (Tomczak & Tomczak 2014)."""
     return (H - k + 1) / (n - k) if n > k else float("nan")
 
 
@@ -106,7 +106,7 @@ def analyze(df: pd.DataFrame, group_col: str, group_order: list[str],
         omni_rows.append(dict(
             Grouping=grouping, Subset=subset, Property=prop, k=k, n=n,
             H=round(float(H), 3), p=float(p),
-            epsilon2=round(epsilon_squared(H, n, k), 4)))
+            eta2=round(eta_squared(H, n, k), 4)))
 
         recs, p_mwu, p_ks = [], [], []
         for a, b in combinations(names, 2):
@@ -169,7 +169,7 @@ def main() -> None:
     print("Caveat: proteoform property values are fixed per sequence and the per-method")
     print("detection sets overlap, so groups are NOT independent -- these tests are")
     print("descriptive. With n in the hundreds, trust effect sizes over p-values.\n")
-    print("epsilon^2 / Cliff's delta guide: negligible <0.01 / <0.147, "
+    print("eta^2 / Cliff's delta guide: negligible <0.01 / <0.147, "
           "small / medium / large above.\n")
 
     print("=" * 80)

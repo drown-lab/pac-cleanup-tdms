@@ -123,10 +123,10 @@ excluded, for each property.
 sequence; methods differ only in *which* proteoforms they detect, and the
 detected sets overlap heavily. The groups are therefore not independent and the
 tests are **descriptive**. With hundreds of proteoforms per group, p-values are
-tiny for even trivial differences, so the **effect sizes** (ε² for the omnibus,
+tiny for even trivial differences, so the **effect sizes** (η² for the omnibus,
 Cliff's δ for pairwise) are what matter.
 
-Battery (scipy only): Kruskal–Wallis omnibus + ε²; pairwise Mann–Whitney U +
+Battery (scipy only): Kruskal–Wallis omnibus + η²; pairwise Mann–Whitney U +
 Cliff's δ; pairwise two-sample Kolmogorov–Smirnov (distribution shape).
 Pairwise p-values are Benjamini–Hochberg corrected within each
 grouping × subset × property family.
@@ -135,7 +135,7 @@ grouping × subset × property family.
 
 | File | Description |
 | ---- | ----------- |
-| `physiochemical_stats_omnibus.csv` | One row per grouping × subset × property: K–W H, p, ε² |
+| `physiochemical_stats_omnibus.csv` | One row per grouping × subset × property: K–W H, p, η² |
 | `physiochemical_stats_pairwise.csv` | One row per pairwise comparison: Cliff's δ, MWU & KS p (raw + BH) |
 
 ### Running
