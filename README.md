@@ -12,7 +12,8 @@ The repository contains several independent scripts:
 
 | Script | Purpose |
 | ------ | ------- |
-| `proteoform_physiochemical_props.py` | Calculate biochemical properties (GRAVY, pI, aromaticity, instability) for a list of protein sequences. |
+| `proteoform_physiochemical_props.py` | Calculate biochemical properties (GRAVY, pI, aromaticity, instability) for FDR-confident proteoforms pulled directly from a ProSightPD `.tdReport`, labeled by cleanup condition. |
+| `physiochemical_stats.py` | Test whether the physiochemical property distributions (mass, pI, GRAVY) vary by cleanup method — by bead type and by condition — with effect sizes (shares the data pipeline of `proteoform_physiochemical_props.py`). |
 | `shared_proteoforms.py` | Compare identification scores of proteoforms shared across sample-cleanup conditions from a ProSightPD `.tdReport`. |
 | `flashdeconv_summary.py` | Summarize FLASHDeconv deconvolution-FDR output (confident-mass yield, Qscore distributions) across spectrum-level `*_ms1.tsv` files. |
 | `filter_features.py` | Filter FLASHDeconv feature TSVs to confident masses (drop decoys, q-value ≤ 5%, ≥3 charge states) for re-running MSTopDiff. |
@@ -37,59 +38,68 @@ conda activate tdms
 
 ## Script 1 — `proteoform_physiochemical_props.py`
 
-Reads a CSV file of protein sequences, calculates several biochemical properties
-for each sequence using Biopython, and writes the results to a new CSV file.
+Pulls FDR-confident proteoform sequences **directly from a ProSightPD
+`.tdReport`** (a SQLite database) and calculates several biochemical properties
+for each, across **all** sample-cleanup conditions grouped by bead type. This
+replaces the earlier workflow of reading sequences from a hand-exported TDreport
+hit-report CSV.
 
 ### Calculated properties
 
+* **Average mass (kDa):** proteoform mass. The DB's `AverageMass` column is only
+  ~40 % populated (placeholder `18.0153` Da otherwise), so the fully-populated
+  `MonoisotopicMass` is used instead; the two differ by ~0.06 % at these sizes
+  (immaterial on a kDa axis).
 * **GRAVY (Grand Average of Hydropathicity):** overall hydrophobicity/hydrophilicity of a protein.
 * **Isoelectric Point (pI):** the pH at which the protein carries no net charge.
-* **Aromaticity:** relative frequency of aromatic amino acids in the sequence.
-* **Instability Index:** predicts whether a protein is stable in vitro.
+* **Aromaticity** and **Instability Index** are also computed into the CSV/summary
+  (not plotted).
 
-### Input
+GRAVY / pI / aromaticity / instability depend only on the bare amino-acid
+sequence; modifications (stored separately in `ModificationHash`) are ignored.
+Selenocysteine (`U`) is substituted with `C` for those calculations only —
+Biopython's hydropathy and instability tables have no `U` — and a `ContainsU`
+flag marks any affected proteoforms (the original sequence is preserved).
 
-A CSV file containing a column named `Sequence`:
+Histones dominate this dataset (roughly half the confident proteoforms), so
+every summary and figure is produced **twice**: once for all confident
+proteoforms and once **excluding histones**. A proteoform is classed as a
+histone (`IsHistone` column) when a comma-delimited entry of its description
+starts with "Histone" — which excludes "Non-histone chromosomal protein HMG-…".
 
-| Column   | Description                                       |
-| -------- | ------------------------------------------------- |
-| Sequence | Protein amino acid sequence in single-letter code |
+### Inputs
 
-Example:
+Both inputs must sit in the same directory as the script:
 
-```csv
-Protein_ID,Sequence
-P001,MKWVTFISLLFLFSSAYSRGVFRR
-P002,MALWMRLLPLLALLALWGPGPG
-```
+| File | Description |
+| ---- | ----------- |
+| `20250723_ifeltens_SP3_TDP_annotated_subsequence_2.tdReport` | ProSightPD report (SQLite); source of proteoform sequences and masses. **Not included in the repository** — supply your own. |
+| `experimental_design.csv` | Maps each raw file to its `Cleanup` / `Resuspension` condition and an `Include` flag. |
 
-### Output
+Selection mirrors `shared_proteoforms.py`:
 
-The original data plus four additional columns:
+* **Proteoform identity** = `ChemicalProteoformId` (sequence + modifications + mass).
+* **"Identified"** = has a PrSM-level (q-value ≤ 0.01) hit in that condition's file(s).
+* Conditions and their left-to-right order, colours and bead-type grouping are
+  set by the `CONDITIONS` list (all nine included files: MCW, then the MagReSyn
+  and Cytiva resuspension series).
 
-| New column        | Description                       |
-| ----------------- | --------------------------------- |
-| GRAVY             | Hydrophobicity score              |
-| Isoelectric Point | Predicted pI value                |
-| Aromaticity       | Fraction of aromatic amino acids  |
-| Instability       | Predicted instability index       |
+### Outputs
 
-Example:
+Written next to the script:
 
-```csv
-Protein_ID,Sequence,GRAVY,Isoelectric Point,Aromaticity,Instability
-P001,MKWVTFISLLFLFSSAYSRGVFRR,-0.256,8.62,0.120,33.45
-```
+| File | Description |
+| ---- | ----------- |
+| `proteoform_physiochemical_props.csv` | One row per unique proteoform: properties + `IsHistone` + per-condition presence |
+| `proteoform_physiochemical_props_long.csv` | Tidy table, one row per proteoform × condition |
+| `physiochemical_summary.csv` | Per-condition × per-property summary statistics (all proteoforms) |
+| `physiochemical_summary_nohistone.csv` | Per-condition × per-property summary statistics, histones excluded |
+| `fig_physiochemical_props.{pdf,png}` | Panel A: average mass, pI and GRAVY stacked, one violin per condition grouped by bead type (all proteoforms) |
+| `fig_physiochemical_props_nohistone.{pdf,png}` | Same stacked panel, histones excluded |
 
-### Configuring file paths
-
-The script uses hard-coded input/output paths near the top of the file. Edit
-them for your environment before running:
-
-```python
-file_path = r'C:\Pycharm_Projects\name_of_your_document.csv'
-output_file_path = r'C:\Pycharm_Projects\name_of_your_document_finished.csv'
-```
+The figures use **violin plots** (kernel-density) rather than box plots because
+the pI distribution is strongly bimodal, which a box plot hides. The script also
+prints per-condition summary statistics to the console.
 
 ### Running
 
@@ -97,8 +107,42 @@ output_file_path = r'C:\Pycharm_Projects\name_of_your_document_finished.csv'
 conda run -n tdms python proteoform_physiochemical_props.py
 ```
 
-On completion the script prints a confirmation message and writes the
-`*_finished.csv` output file.
+---
+
+## Script 1b — `physiochemical_stats.py`
+
+Tests whether the property distributions (average mass, pI, GRAVY) **vary by
+cleanup method**, reusing the exact FDR-confident dataset assembled by
+`proteoform_physiochemical_props.py` (imported via its shared `load_dataset()`).
+
+Two groupings are tested — **bead type** (MCW vs MagReSyn vs Cytiva, resuspensions
+pooled) and **all nine conditions** — each on all proteoforms and with histones
+excluded, for each property.
+
+**Key caveat:** a proteoform's property value is a fixed attribute of its
+sequence; methods differ only in *which* proteoforms they detect, and the
+detected sets overlap heavily. The groups are therefore not independent and the
+tests are **descriptive**. With hundreds of proteoforms per group, p-values are
+tiny for even trivial differences, so the **effect sizes** (η² for the omnibus,
+Cliff's δ for pairwise) are what matter.
+
+Battery (scipy only): Kruskal–Wallis omnibus + η²; pairwise Mann–Whitney U +
+Cliff's δ; pairwise two-sample Kolmogorov–Smirnov (distribution shape).
+Pairwise p-values are Benjamini–Hochberg corrected within each
+grouping × subset × property family.
+
+### Outputs
+
+| File | Description |
+| ---- | ----------- |
+| `physiochemical_stats_omnibus.csv` | One row per grouping × subset × property: K–W H, p, η² |
+| `physiochemical_stats_pairwise.csv` | One row per pairwise comparison: Cliff's δ, MWU & KS p (raw + BH) |
+
+### Running
+
+```bash
+conda run -n tdms python physiochemical_stats.py
+```
 
 ---
 
