@@ -8,12 +8,17 @@ sample-cleanup approach for **t**op-**d**own **p**roteomics (TDP). The code
 accompanies the associated publication and is provided as-is to make the
 analysis reproducible.
 
-There are two independent scripts:
+The repository contains several independent scripts:
 
 | Script | Purpose |
 | ------ | ------- |
 | `proteoform_physiochemical_props.py` | Calculate biochemical properties (GRAVY, pI, aromaticity, instability) for a list of protein sequences. |
 | `shared_proteoforms.py` | Compare identification scores of proteoforms shared across sample-cleanup conditions from a ProSightPD `.tdReport`. |
+| `flashdeconv_summary.py` | Summarize FLASHDeconv deconvolution-FDR output (confident-mass yield, Qscore distributions) across spectrum-level `*_ms1.tsv` files. |
+| `filter_features.py` | Filter FLASHDeconv feature TSVs to confident masses (drop decoys, q-value ≤ 5%, ≥3 charge states) for re-running MSTopDiff. |
+| `mstopdiff_compare.py` | Build the MSTopDiff Δmass modification figures (per-condition intensity×count histograms, relative-abundance bars and heatmap). |
+| `mstopdiff_unannotated.py` | Classify detected Δmass peaks as known / off-by-one satellite / isotope / unannotated and quantify the unexplained fraction. |
+| `mstopdiff_config.py` | Shared dataset registry (auto-discovers MSTopDiff exports, labels/colours them from `experimental_design.csv`); imported by the two scripts above. |
 
 ---
 
@@ -157,6 +162,93 @@ proteoforms.
 
 ```bash
 conda run -n tdms python shared_proteoforms.py
+```
+
+---
+
+## MSTopDiff modification analysis
+
+This set of scripts evaluates whether each sample-cleanup approach **introduces
+artifactual modifications or suppresses PTMs**, using
+[MSTopDiff](https://github.com/PhilippKaulich/MSTopDiff) Δmass histograms of
+the FLASHDeconv masses. The approach mirrors Kaulich *et al.* 2024
+(*Nat. Methods* **21**, 2397–2407), Figure 5d: per-condition intensity×count
+histograms of all pairwise proteoform mass differences, with peaks annotated
+against common modifications.
+
+MSTopDiff (v1.1.0) was run on the confident-mass feature tables with these
+parameters:
+
+| Parameter | Value |
+| --------- | ----- |
+| Mass feature filter | 0 – 100 kDa |
+| Retention time range | 0 – 60 min |
+| Delta mass range | 0 – 150 Da |
+| Retention time window | 2 min |
+| Maximum charge difference | 2 |
+| Bin size | 0.01 Da |
+
+### Confidence filtering (`filter_features.py`)
+
+The raw FLASHDeconv **feature** TSVs (the MSTopDiff inputs) contain ~50 % decoy
+features (`IsDecoy=1`) and many low-confidence masses — only ~10 % of features
+are confident. The deconvolution FDR / q-values are already computed by
+FLASHDeconv and stored in the spectrum-level `*_ms1.tsv` files (per-observation
+`Qvalue`, with a `FeatureIndex` linking each observation to a feature). The
+charge-state count does **not** control FDR (decoys carry similar charge
+envelopes), so confidence must come from the q-value.
+
+`filter_features.py` maps each feature's best (minimum) q-value up from its
+`*_ms1.tsv` observations and writes confident copies of the feature tables:
+
+* keep `IsDecoy == 0` and `MSLevel == 1`
+* keep feature q-value ≤ `FDR_THRESH` (default 0.05)
+* keep `ChargeCount ≥ MIN_CHARGE_STATES` (default 3)
+
+Output: `flashdeconv/filtered/<stem>_conf.tsv` (same columns/format). Re-run
+MSTopDiff (GUI; no CLI) on these and place the resulting
+`<stem>_conf_mstopdiff.csv` into `flashdeconv/mstopdiff/`.
+
+### Dataset registry (`mstopdiff_config.py`)
+
+Auto-discovers every `flashdeconv/mstopdiff/*_conf_mstopdiff.csv`, then labels,
+colours and orders each dataset from `experimental_design.csv` (MCW = green,
+Cytiva = blues, MagReSyn = reds, shaded by resuspension), flagging the three
+publication datasets (MCW, Cytiva 0.5 % TFA, MagReSyn 0.5 % TFA). Both analysis
+scripts import it, so adding a CSV needs no code change. **Note:** the MSTopDiff
+CSV's date prefix must match the raw/design date or the dataset is skipped.
+
+### Figures (`mstopdiff_compare.py`)
+
+Reads the MSTopDiff CSV columns (`bin`, `count`, `intensity_lower_mass`,
+`intensity_higher_mass`, and the `… x count` variants), rebins to 0.1 Da and
+plots single-sided intensity×count histograms (0–90 Da, each normalised to its
+own base peak). Outputs:
+
+| File | Description |
+| ---- | ----------- |
+| `fig_mstopdiff_ixc.{png,pdf}` | Publication figure — stacked histograms for the three datasets |
+| `fig_mstopdiff_ixc_all.{png,pdf}` | Stacked histograms for **all** discovered datasets |
+| `fig_mstopdiff_mod_heatmap.{png,pdf}` | Modification × dataset heatmap of relative abundance |
+| `fig_mstopdiff_mod_enrichment.{png,pdf}` | Relative-abundance bars (publication subset) |
+| `mstopdiff_mod_table.csv` | Relative abundance (% of base peak) per modification per dataset |
+
+### Unannotated-peak analysis (`mstopdiff_unannotated.py`)
+
+Detects peaks ≥ `REL_THRESH` (default 10 %) of the base peak and classifies each
+by its Δmass as **known** (single modification or pairwise combination),
+**off-by-one satellite** of a known mass (±1.0023 Da deconvolution error),
+**integer/isotope comb**, or **unannotated**, then reports the intensity-weighted
+unexplained fraction (with a threshold sensitivity sweep). Outputs
+`fig_mstopdiff_unannotated.{png,pdf}` and `mstopdiff_unannotated_*.csv`.
+
+### Running
+
+```bash
+conda run -n tdms python filter_features.py        # write confident _conf.tsv
+# (re-run MSTopDiff on flashdeconv/filtered/*_conf.tsv -> flashdeconv/mstopdiff/)
+conda run -n tdms python mstopdiff_compare.py
+conda run -n tdms python mstopdiff_unannotated.py
 ```
 
 ---
