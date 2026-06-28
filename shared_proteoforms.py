@@ -48,7 +48,7 @@ from scipy import stats
 from matplotlib_venn import venn3
 
 HERE = Path(__file__).resolve().parent
-DB = HERE / "20250723_ifeltens_annotated.tdReport"
+DB = HERE / "20250723_ifeltens_SP3_TDP_annotated_subsequence_2.tdReport"
 DESIGN = HERE / "experimental_design.csv"
 
 # ScoreTypeId 2 == kelleher_negLog_pScore (see ScoreType table / tdReport_schema.md)
