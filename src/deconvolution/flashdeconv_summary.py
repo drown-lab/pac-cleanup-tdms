@@ -19,10 +19,13 @@ number of confident masses summed over all MS1 spectra in the file - the same
 LC-feature-level counts instead, point this at the feature TSV (the ``-out``
 file) rather than the ``-out_spec1`` file.
 
+Outputs: figures to results/figures/, the summary table to results/tables/.
+
 Usage
 -----
-    python flashdeconv_fdr_summary.py F:/SP3_TDMS/flashdeconv
-    python flashdeconv_fdr_summary.py F:/SP3_TDMS/flashdeconv \
+    # defaults to reading data/flashdeconv
+    python src/deconvolution/flashdeconv_summary.py
+    python src/deconvolution/flashdeconv_summary.py path/to/tsvs \
         --glob "*_ms1.tsv" --thresholds 0.01 0.05 0.10 --per-file-plots
 """
 from __future__ import annotations
@@ -38,6 +41,14 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
+
+# Repo layout: this script lives in src/deconvolution/, so the project root is
+# two levels up. Inputs default to data/flashdeconv/; figures go to
+# results/figures/ and the summary table to results/tables/.
+ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_INPUT_DIR = ROOT / "data" / "flashdeconv"
+FIGURES_DIR = ROOT / "results" / "figures"
+TABLES_DIR = ROOT / "results" / "tables"
 
 # Canonical name -> candidate raw column names (matched after normalization).
 # Column spelling varies across FLASHDeconv builds, so we resolve by candidates
@@ -192,9 +203,10 @@ def plot_target_decoy(path: Path, target_value: int, out_path: Path) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("input_dir", type=Path, help="Folder containing FLASHDeconv spectrum TSVs.")
+    p.add_argument("input_dir", type=Path, nargs="?", default=DEFAULT_INPUT_DIR,
+                   help="Folder containing FLASHDeconv spectrum TSVs "
+                        "(default: data/flashdeconv).")
     p.add_argument("--glob", default="*_ms1.tsv", help="Filename pattern (default: %(default)s).")
-    p.add_argument("--out-dir", type=Path, default=None, help="Output folder (default: <input_dir>/fdr_summary).")
     p.add_argument("--thresholds", type=float, nargs="+", default=[0.01, 0.05, 0.10], help="FDR thresholds for the yield table.")
     p.add_argument("--target-value", type=int, default=0, help="Decoy-column value denoting a target mass (default: 0).")
     p.add_argument("--per-file-plots", action="store_true", help="Also write a target/decoy step plot per file.")
@@ -206,8 +218,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"No files matching {args.glob!r} in {args.input_dir}", file=sys.stderr)
         return 1
 
-    out_dir = args.out_dir or (args.input_dir / "fdr_summary")
-    out_dir.mkdir(parents=True, exist_ok=True)
+    FIGURES_DIR.mkdir(parents=True, exist_ok=True)
+    TABLES_DIR.mkdir(parents=True, exist_ok=True)
 
     print(f"Found {len(files)} file(s). Summarizing...")
     rows = []
@@ -224,20 +236,20 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     summary = pd.DataFrame(rows).sort_values("file").reset_index(drop=True)
-    csv_path = out_dir / "deconvolution_fdr_summary.csv"
+    csv_path = TABLES_DIR / "deconvolution_fdr_summary.csv"
     summary.to_csv(csv_path, index=False)
     print(f"\nWrote {csv_path}")
     print(summary.to_string(index=False))
 
     ok_files = [f for f in files if f.stem in set(summary["file"])]
 
-    plot_qscore_distributions(ok_files, args.target_value, out_dir / "qscore_distributions.png")
-    plot_yield_curves(ok_files, args.target_value, out_dir / "yield_vs_fdr.png")
-    print(f"Wrote {out_dir / 'qscore_distributions.png'}")
-    print(f"Wrote {out_dir / 'yield_vs_fdr.png'}")
+    plot_qscore_distributions(ok_files, args.target_value, FIGURES_DIR / "qscore_distributions.png")
+    plot_yield_curves(ok_files, args.target_value, FIGURES_DIR / "yield_vs_fdr.png")
+    print(f"Wrote {FIGURES_DIR / 'qscore_distributions.png'}")
+    print(f"Wrote {FIGURES_DIR / 'yield_vs_fdr.png'}")
 
     if args.per_file_plots:
-        pf_dir = out_dir / "per_file"
+        pf_dir = FIGURES_DIR / "flashdeconv_per_file"
         pf_dir.mkdir(exist_ok=True)
         for path in ok_files:
             plot_target_decoy(path, args.target_value, pf_dir / f"{path.stem}_target_decoy.png")

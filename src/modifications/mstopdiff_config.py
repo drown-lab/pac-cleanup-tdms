@@ -14,9 +14,15 @@ import sys
 import glob
 import pandas as pd
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-MSTOPDIFF_DIR = os.path.join(HERE, "flashdeconv", "mstopdiff")
-DESIGN = os.path.join(HERE, "experimental_design.csv")
+# Repo layout: this module lives in src/modifications/, so the project root is
+# two levels up. Inputs live under data/ and config/, outputs under results/.
+# These path constants are imported by mstopdiff_compare.py and mstopdiff_unannotated.py.
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+DATA_DIR = os.path.join(ROOT, "data")
+MSTOPDIFF_DIR = os.path.join(DATA_DIR, "flashdeconv", "mstopdiff")
+DESIGN = os.path.join(ROOT, "config", "experimental_design.csv")
+FIGURES_DIR = os.path.join(ROOT, "results", "figures")
+TABLES_DIR = os.path.join(ROOT, "results", "tables")
 
 # Short family names and a fixed resuspension display order.
 FAMILY_SHORT = {"MCW": "MCW", "Cytiva Carboxyl": "Cyt", "MagReSyn Hydroxyl": "Hyd"}

@@ -25,8 +25,10 @@ import glob
 import numpy as np
 import pandas as pd
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-FD = os.path.join(HERE, "flashdeconv")
+# Repo layout: this script lives in src/deconvolution/, so the project root is
+# two levels up; the FLASHDeconv feature tables live under data/flashdeconv/.
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+FD = os.path.join(ROOT, "data", "flashdeconv")
 OUT = os.path.join(FD, "filtered")
 
 MIN_CHARGE_STATES = 3

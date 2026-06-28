@@ -53,9 +53,14 @@ import matplotlib.pyplot as plt
 from scipy import stats
 from Bio.SeqUtils.ProtParam import ProteinAnalysis
 
-HERE = Path(__file__).resolve().parent
-DB = HERE / "20250723_ifeltens_SP3_TDP_annotated_subsequence_2.tdReport"
-DESIGN = HERE / "experimental_design.csv"
+# Repo layout: this script lives in src/identification/, so the project root is
+# two levels up. Inputs live under data/ and config/, outputs under results/.
+ROOT = Path(__file__).resolve().parents[2]
+DATA_DIR = ROOT / "data"
+DB = DATA_DIR / "20250723_ifeltens_SP3_TDP_annotated_subsequence_2.tdReport"
+DESIGN = ROOT / "config" / "experimental_design.csv"
+FIGURES_DIR = ROOT / "results" / "figures"
+TABLES_DIR = ROOT / "results" / "tables"
 
 # PrSM-level (AggregationLevel 0) q-value threshold for a confident identification.
 PRSM_QVALUE_MAX = 0.01
@@ -110,8 +115,9 @@ def style_matplotlib() -> None:
 
 
 def savefig(fig, stem) -> None:
+    FIGURES_DIR.mkdir(parents=True, exist_ok=True)
     for ext in FIG_EXTS:
-        fig.savefig(HERE / f"{stem}.{ext}", dpi=150, bbox_inches="tight")
+        fig.savefig(FIGURES_DIR / f"{stem}.{ext}", dpi=150, bbox_inches="tight")
 
 
 def is_histone(description) -> bool:
@@ -348,6 +354,7 @@ def main() -> None:
         raise SystemExit(f"Design file not found: {DESIGN}")
 
     style_matplotlib()
+    TABLES_DIR.mkdir(parents=True, exist_ok=True)
 
     con = sqlite3.connect(f"file:{DB}?mode=ro", uri=True)
     try:
@@ -377,10 +384,10 @@ def main() -> None:
             .sort_values(["NumConditions", "ChemicalProteoformId"],
                          ascending=[False, True]))
     wide[front + prop_cols[1:] + cond_order + ["NumConditions"]].to_csv(
-        HERE / "proteoform_physiochemical_props.csv", index=False)
+        TABLES_DIR / "proteoform_physiochemical_props.csv", index=False)
 
     # ---- tidy / long: one row per (proteoform x condition) ------------------
-    long.to_csv(HERE / "proteoform_physiochemical_props_long.csv", index=False)
+    long.to_csv(TABLES_DIR / "proteoform_physiochemical_props_long.csv", index=False)
 
     n_hist = int(props["IsHistone"].sum())
     n_u = int(props["ContainsU"].sum())
@@ -393,7 +400,7 @@ def main() -> None:
         long, meta, tag="all proteoforms",
         title=f"Proteoform physiochemical properties by condition "
               f"(n={len(confident_ids)} FDR-confident proteoforms)",
-        summary_path=HERE / "physiochemical_summary.csv",
+        summary_path=TABLES_DIR / "physiochemical_summary.csv",
         fig_stem="fig_physiochemical_props")
 
     long_nh = long[~long["IsHistone"]]
@@ -401,7 +408,7 @@ def main() -> None:
         long_nh, meta, tag="histones excluded",
         title=f"Proteoform physiochemical properties by condition, histones excluded "
               f"(n={long_nh['ChemicalProteoformId'].nunique()} proteoforms)",
-        summary_path=HERE / "physiochemical_summary_nohistone.csv",
+        summary_path=TABLES_DIR / "physiochemical_summary_nohistone.csv",
         fig_stem="fig_physiochemical_props_nohistone")
 
     print("\nWrote: proteoform_physiochemical_props.csv, "

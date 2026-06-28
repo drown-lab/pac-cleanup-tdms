@@ -47,9 +47,13 @@ import seaborn as sns
 from scipy import stats
 from matplotlib_venn import venn3
 
-HERE = Path(__file__).resolve().parent
-DB = HERE / "20250723_ifeltens_SP3_TDP_annotated_subsequence_2.tdReport"
-DESIGN = HERE / "experimental_design.csv"
+# Repo layout: this script lives in src/identification/, so the project root is
+# two levels up. Inputs live under data/ and config/, outputs under results/.
+ROOT = Path(__file__).resolve().parents[2]
+DB = ROOT / "data" / "20250723_ifeltens_SP3_TDP_annotated_subsequence_2.tdReport"
+DESIGN = ROOT / "config" / "experimental_design.csv"
+FIGURES_DIR = ROOT / "results" / "figures"
+TABLES_DIR = ROOT / "results" / "tables"
 
 # ScoreTypeId 2 == kelleher_negLog_pScore (see ScoreType table / tdReport_schema.md)
 NEGLOG_PSCORE_SCORETYPE_ID = 2
@@ -67,9 +71,10 @@ FIG_EXTS = ("pdf", "png")  # vector PDF deliverable + PNG preview
 
 
 def savefig(obj, stem):
-    """Save a Matplotlib Figure or seaborn grid to all FIG_EXTS next to this script."""
+    """Save a Matplotlib Figure or seaborn grid to all FIG_EXTS under results/figures."""
+    FIGURES_DIR.mkdir(parents=True, exist_ok=True)
     for ext in FIG_EXTS:
-        obj.savefig(HERE / f"{stem}.{ext}", dpi=150)
+        obj.savefig(FIGURES_DIR / f"{stem}.{ext}", dpi=150)
 
 
 def load_selected_files(con: sqlite3.Connection) -> pd.DataFrame:
@@ -184,7 +189,8 @@ def main() -> None:
                   .join(membership, how="right").reset_index()
                   .sort_values(["NumConditions", "ChemicalProteoformId"],
                                ascending=[False, True]))
-    membership.to_csv(HERE / "identification_membership.csv", index=False)
+    TABLES_DIR.mkdir(parents=True, exist_ok=True)
+    membership.to_csv(TABLES_DIR / "identification_membership.csv", index=False)
 
     # ---- wide matrix: proteoform x condition --------------------------------
     wide = (shared.pivot(index="ChemicalProteoformId", columns="Condition",
@@ -195,7 +201,7 @@ def main() -> None:
 
     front = ["ChemicalProteoformId", "Accession", "Description",
              "MonoisotopicMass", "ModificationHash"]
-    wide[front + cond_order].to_csv(HERE / "shared_proteoforms_wide.csv", index=False)
+    wide[front + cond_order].to_csv(TABLES_DIR / "shared_proteoforms_wide.csv", index=False)
 
     # ---- tidy / long --------------------------------------------------------
     long = shared.merge(
@@ -203,14 +209,14 @@ def main() -> None:
         on="ChemicalProteoformId", how="left")
     long["Condition"] = pd.Categorical(long["Condition"], categories=cond_order, ordered=True)
     long = long.sort_values(["ChemicalProteoformId", "Condition"])
-    long.to_csv(HERE / "shared_proteoforms_long.csv", index=False)
+    long.to_csv(TABLES_DIR / "shared_proteoforms_long.csv", index=False)
 
     # ---- per-condition summary ----------------------------------------------
     summary = (long.groupby("Condition", observed=True)["NegLogPScore"]
                .agg(n="count", mean="mean", median="median", sd="std",
                     min="min", max="max")
                .reindex(cond_order).round(3))
-    summary.to_csv(HERE / "per_sample_score_summary.csv")
+    summary.to_csv(TABLES_DIR / "per_sample_score_summary.csv")
 
     # ---- statistics ---------------------------------------------------------
     mat = wide.set_index("ChemicalProteoformId")[cond_order]

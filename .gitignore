@@ -22,10 +22,17 @@ env/
 .DS_Store
 Thumbs.db
 
-# Figures
-*.png
-*.pdf
+# Large input data (user-supplied; see data/README.md). Raw/mzML go to a
+# proteomics repository (PRIDE/MassIVE), not git; the .tdReport is too large.
+/data/*
+!/data/README.md
+*.tdReport
 
-# Results tables
-*.csv
-*.tsv
+# Final figures (results/figures/) and the small summary/stat tables under
+# results/tables/ ARE tracked. The bulky, fully regenerable per-row dumps are not.
+/results/tables/proteoform_physiochemical_props.csv
+/results/tables/proteoform_physiochemical_props_long.csv
+/results/tables/shared_proteoforms_long.csv
+/results/tables/shared_proteoforms_wide.csv
+/results/tables/identification_membership.csv
+/results/tables/mstopdiff_peaks_annotated.csv

@@ -1,0 +1,13 @@
+Grouping,Subset,Property,k,n,H,p,eta2
+bead type,all,Mass_kDa,3,2697,4.007,0.13486049990338062,0.0007
+bead type,all,IsoelectricPoint,3,2697,21.879,1.7744913339224185e-05,0.0074
+bead type,all,GRAVY,3,2697,0.097,0.952628963200257,-0.0007
+condition,all,Mass_kDa,9,4950,36.92,1.190614906934741e-05,0.0059
+condition,all,IsoelectricPoint,9,4950,74.457,6.336440466142029e-13,0.0135
+condition,all,GRAVY,9,4950,17.6,0.02443166678650243,0.0019
+bead type,no-histone,Mass_kDa,3,1247,9.611,0.008182744524783887,0.0061
+bead type,no-histone,IsoelectricPoint,3,1247,11.288,0.0035392767309024246,0.0075
+bead type,no-histone,GRAVY,3,1247,4.9,0.08627533823613934,0.0023
+condition,no-histone,Mass_kDa,9,2342,25.274,0.0013966112370309516,0.0074
+condition,no-histone,IsoelectricPoint,9,2342,22.015,0.004888412996580097,0.006
+condition,no-histone,GRAVY,9,2342,50.335,3.523427481110497e-08,0.0181
