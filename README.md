@@ -13,6 +13,7 @@ The repository contains several independent scripts:
 | Script | Purpose |
 | ------ | ------- |
 | `proteoform_physiochemical_props.py` | Calculate biochemical properties (GRAVY, pI, aromaticity, instability) for FDR-confident proteoforms pulled directly from a ProSightPD `.tdReport`, labeled by cleanup condition. |
+| `physiochemical_stats.py` | Test whether the physiochemical property distributions (mass, pI, GRAVY) vary by cleanup method — by bead type and by condition — with effect sizes (shares the data pipeline of `proteoform_physiochemical_props.py`). |
 | `shared_proteoforms.py` | Compare identification scores of proteoforms shared across sample-cleanup conditions from a ProSightPD `.tdReport`. |
 | `flashdeconv_summary.py` | Summarize FLASHDeconv deconvolution-FDR output (confident-mass yield, Qscore distributions) across spectrum-level `*_ms1.tsv` files. |
 | `filter_features.py` | Filter FLASHDeconv feature TSVs to confident masses (drop decoys, q-value ≤ 5%, ≥3 charge states) for re-running MSTopDiff. |
@@ -104,6 +105,43 @@ prints per-condition summary statistics to the console.
 
 ```bash
 conda run -n tdms python proteoform_physiochemical_props.py
+```
+
+---
+
+## Script 1b — `physiochemical_stats.py`
+
+Tests whether the property distributions (average mass, pI, GRAVY) **vary by
+cleanup method**, reusing the exact FDR-confident dataset assembled by
+`proteoform_physiochemical_props.py` (imported via its shared `load_dataset()`).
+
+Two groupings are tested — **bead type** (MCW vs MagReSyn vs Cytiva, resuspensions
+pooled) and **all nine conditions** — each on all proteoforms and with histones
+excluded, for each property.
+
+**Key caveat:** a proteoform's property value is a fixed attribute of its
+sequence; methods differ only in *which* proteoforms they detect, and the
+detected sets overlap heavily. The groups are therefore not independent and the
+tests are **descriptive**. With hundreds of proteoforms per group, p-values are
+tiny for even trivial differences, so the **effect sizes** (ε² for the omnibus,
+Cliff's δ for pairwise) are what matter.
+
+Battery (scipy only): Kruskal–Wallis omnibus + ε²; pairwise Mann–Whitney U +
+Cliff's δ; pairwise two-sample Kolmogorov–Smirnov (distribution shape).
+Pairwise p-values are Benjamini–Hochberg corrected within each
+grouping × subset × property family.
+
+### Outputs
+
+| File | Description |
+| ---- | ----------- |
+| `physiochemical_stats_omnibus.csv` | One row per grouping × subset × property: K–W H, p, ε² |
+| `physiochemical_stats_pairwise.csv` | One row per pairwise comparison: Cliff's δ, MWU & KS p (raw + BH) |
+
+### Running
+
+```bash
+conda run -n tdms python physiochemical_stats.py
 ```
 
 ---

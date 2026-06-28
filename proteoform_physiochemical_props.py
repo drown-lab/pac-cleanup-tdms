@@ -295,26 +295,22 @@ def report_and_render(long: pd.DataFrame, meta: pd.DataFrame, tag: str,
     make_figure(long, meta, title, fig_stem)
 
 
-def main() -> None:
-    if not DB.exists():
-        raise SystemExit(f"Database not found: {DB}")
-    if not DESIGN.exists():
-        raise SystemExit(f"Design file not found: {DESIGN}")
+def load_dataset(con: sqlite3.Connection) -> tuple[pd.DataFrame, pd.DataFrame,
+                                                   pd.DataFrame, pd.DataFrame]:
+    """Assemble the FDR-confident proteoform dataset from the .tdReport.
 
-    style_matplotlib()
-
-    con = sqlite3.connect(f"file:{DB}?mode=ro", uri=True)
-    try:
-        meta = build_condition_meta(con)
-        all_file_ids = sorted({fid for ids in meta["DataFileIds"] for fid in ids})
-        ident = load_confident_proteoforms(con, all_file_ids)
-        annot = load_annotation(con)
-    finally:
-        con.close()
-
-    print("Conditions (left-to-right) and their files:")
-    for _, r in meta.iterrows():
-        print(f"  {r['Condition']:20s}: {', '.join(r['FileNames'])}")
+    Returns (meta, props, pf_cond, long):
+      meta    one row per condition (BeadGroup, XLabel, Colour, Position, files)
+      props   one row per unique proteoform (sequence, masses, properties, flags)
+      pf_cond one row per (proteoform, condition) it was confidently identified in
+      long    pf_cond joined to props (tidy table for plotting / statistics)
+    Shared by the figure script and physiochemical_stats.py so both use the exact
+    same identification set and property values.
+    """
+    meta = build_condition_meta(con)
+    all_file_ids = sorted({fid for ids in meta["DataFileIds"] for fid in ids})
+    ident = load_confident_proteoforms(con, all_file_ids)
+    annot = load_annotation(con)
 
     # map DataFileId -> Condition, then to one row per (proteoform, condition)
     file_to_cond = {fid: r["Condition"]
@@ -326,7 +322,6 @@ def main() -> None:
     if len(confident_ids) == 0:
         raise SystemExit("No FDR-confident proteoforms found for the chosen conditions.")
 
-    # ---- physiochemical properties per UNIQUE proteoform --------------------
     props = annot[annot["ChemicalProteoformId"].isin(confident_ids)].copy()
     props["Mass_kDa"] = props["MonoisotopicMass"] / 1000.0
     props["Length"] = props["Sequence"].str.len()
@@ -335,6 +330,36 @@ def main() -> None:
     props[["GRAVY", "IsoelectricPoint", "Aromaticity", "Instability"]] = (
         props["Sequence"].apply(lambda s: pd.Series(calculate_properties(s))))
 
+    cond_order = meta["Condition"].tolist()
+    prop_cols = [c for c, _ in SUMMARY_PROPERTIES]
+    long = pf_cond.merge(
+        props[["ChemicalProteoformId", "Accession", "Description", "IsHistone",
+               "Length", "ContainsU"] + prop_cols],
+        on="ChemicalProteoformId", how="left")
+    long["Condition"] = pd.Categorical(long["Condition"], categories=cond_order, ordered=True)
+    long = long.sort_values(["Condition", "ChemicalProteoformId"])
+    return meta, props, pf_cond, long
+
+
+def main() -> None:
+    if not DB.exists():
+        raise SystemExit(f"Database not found: {DB}")
+    if not DESIGN.exists():
+        raise SystemExit(f"Design file not found: {DESIGN}")
+
+    style_matplotlib()
+
+    con = sqlite3.connect(f"file:{DB}?mode=ro", uri=True)
+    try:
+        meta, props, pf_cond, long = load_dataset(con)
+    finally:
+        con.close()
+
+    print("Conditions (left-to-right) and their files:")
+    for _, r in meta.iterrows():
+        print(f"  {r['Condition']:20s}: {', '.join(r['FileNames'])}")
+
+    confident_ids = props["ChemicalProteoformId"].unique()
     cond_order = meta["Condition"].tolist()
     prop_cols = [c for c, _ in SUMMARY_PROPERTIES]
 
@@ -355,12 +380,6 @@ def main() -> None:
         HERE / "proteoform_physiochemical_props.csv", index=False)
 
     # ---- tidy / long: one row per (proteoform x condition) ------------------
-    long = pf_cond.merge(
-        props[["ChemicalProteoformId", "Accession", "Description", "IsHistone",
-               "Length", "ContainsU"] + prop_cols],
-        on="ChemicalProteoformId", how="left")
-    long["Condition"] = pd.Categorical(long["Condition"], categories=cond_order, ordered=True)
-    long = long.sort_values(["Condition", "ChemicalProteoformId"])
     long.to_csv(HERE / "proteoform_physiochemical_props_long.csv", index=False)
 
     n_hist = int(props["IsHistone"].sum())
