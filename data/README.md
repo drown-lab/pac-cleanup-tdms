@@ -7,7 +7,7 @@ repositories, not GitHub. Recreate this layout locally to run the scripts.
 | Path | Contents | Source |
 | ---- | -------- | ------ |
 | `raw/` | Thermo `.raw` acquisitions (one per cleanup condition) | ProteomeXchange/PRIDE accession **<ADD ACCESSION>** |
-| `mzML/` | `.raw` converted to `.mzML` (ThermoRawFileParser) | derive from `raw/` |
+| `mzML/` | `.raw` converted to `.mzML` (MSConvert / ProteoWizard 3.0.25326-3a190dc) | derive from `raw/` |
 | `flashdeconv/` | FLASHDeconv feature/spectrum TSVs, plus `filtered/` and `mstopdiff/` subfolders | produced by `src/deconvolution/` + MSTopDiff |
 | `20250723_ifeltens_SP3_TDP_annotated_subsequence_2.tdReport` | ProSightPD identification report (SQLite) | ProSightPD search; **<ADD ACCESSION/DOI>** |
 

@@ -66,13 +66,101 @@ anywhere. Inputs (raw data and the `.tdReport`) are not included — see
 Install the dependencies with conda:
 
 ```bash
-conda env create -f environment.yml
+conda env create -f environment.yml      # loose pins, latest compatible
 conda activate tdms
+```
+
+For an exact reproduction of the published analysis, recreate the pinned
+environment instead:
+
+```bash
+conda env create -f environment.lock.yml
 ```
 
 ---
 
-## Script 1 — `proteoform_physiochemical_props.py`
+## Reproducing the analysis
+
+### Data flow
+
+```
+ data/raw/  (Thermo .raw)                 data/<...>.tdReport  (ProSightPD search)
+     │  MSConvert (ProteoWizard)                    │
+     ▼                                             ▼
+ data/mzML/                              ┌──────────────────────────────────────┐
+     │  FLASHDeconv                      │ src/identification/                    │
+     │  (src/deconvolution/run_*.ps1)    │   shared_proteoforms.py                │
+     ▼                                   │   proteoform_physiochemical_props.py   │
+ data/flashdeconv/                       │   physiochemical_stats.py              │
+   ├─ <stem>.tsv      (features)         └──────────────────┬─────────────────────┘
+   └─ <stem>_ms1.tsv  (spectra, q-vals)                     ▼
+     │  filter_features.py                              results/
+     ▼
+ data/flashdeconv/filtered/<stem>_conf.tsv
+     │  MSTopDiff (GUI)
+     ▼
+ data/flashdeconv/mstopdiff/<stem>_conf_mstopdiff.csv
+     │  mstopdiff_compare.py / mstopdiff_unannotated.py
+     ▼
+ results/   (figures + tables)
+```
+
+### Steps
+
+Steps marked **(external)** are run outside this repo; place their outputs under
+`data/` as shown (see [`data/README.md`](data/README.md)). The Python steps read
+`data/`/`config/` and write `results/`.
+
+1. **(external)** Acquire the `.raw` files → `data/raw/`.
+2. **(external)** Convert `.raw` → `.mzML` with MSConvert (ProteoWizard) → `data/mzML/`.
+3. **(external)** Deconvolve with FLASHDeconv → `data/flashdeconv/`
+   (`src/deconvolution/run_FLASHDeconv.ps1` or `run_FLASHDeconv_parallel.ps1`;
+   edit the in-script paths for your machine).
+4. `flashdeconv_summary.py` — deconvolution-FDR QC (yield, Qscore).
+5. `filter_features.py` — write confident features → `data/flashdeconv/filtered/`.
+6. **(external)** Run MSTopDiff (GUI) on the filtered features with the parameters
+   in the [MSTopDiff section](#mstopdiff-modification-analysis) →
+   `data/flashdeconv/mstopdiff/`.
+7. `mstopdiff_compare.py` and `mstopdiff_unannotated.py` — Δmass figures/tables.
+8. **(external)** ProSightPD search of the `.raw` files → the `.tdReport` in `data/`.
+9. `shared_proteoforms.py`, `proteoform_physiochemical_props.py`,
+   `physiochemical_stats.py` — identification + physiochemical analysis.
+
+The Python steps (4, 5, 7, 9) can be run individually, or together once `data/`
+is populated:
+
+```bash
+make all          # runs every Python step (override the interpreter with PY=...)
+make identification   # just the .tdReport analyses; see the Makefile for targets
+```
+
+`make` invokes `conda run -n tdms python …`; without `make`, run the commands
+under each script's **Running** heading below.
+
+### Software versions
+
+The published results were produced with:
+
+| Software | Version |
+| -------- | ------- |
+| Python | 3.12.13 |
+| NumPy | 2.5.0 |
+| pandas | 3.0.3 |
+| SciPy | 1.18.0 |
+| matplotlib | 3.11.0 |
+| matplotlib-venn | 1.1.2 |
+| seaborn | 0.13.2 |
+| Biopython | 1.87 |
+| FLASHDeconv (OpenMS) | 3.5.0 |
+| MSConvert (ProteoWizard) | 3.0.25326-3a190dc |
+| MSTopDiff | 1.1.0 |
+| ProSightPD | 4.2 |
+
+Python package versions are pinned exactly in `environment.lock.yml`.
+
+---
+
+## Proteoform physiochemical properties (`proteoform_physiochemical_props.py`)
 
 Pulls FDR-confident proteoform sequences **directly from a ProSightPD
 `.tdReport`** (a SQLite database) and calculates several biochemical properties
@@ -105,24 +193,17 @@ starts with "Histone" — which excludes "Non-histone chromosomal protein HMG-�
 
 ### Inputs
 
-The two inputs (paths relative to the repository root):
+Uses the shared inputs — the `.tdReport` in `data/` and
+`config/experimental_design.csv` (see [Repository layout](#repository-layout) and
+[`data/README.md`](data/README.md)). Identification uses the same
+`ChemicalProteoformId` identity and PrSM-level q ≤ 0.01 confidence rule as
+`shared_proteoforms.py`.
 
-| File | Description |
-| ---- | ----------- |
-| `data/20250723_ifeltens_SP3_TDP_annotated_subsequence_2.tdReport` | ProSightPD report (SQLite); source of proteoform sequences and masses. **Not included in the repository** — supply your own. |
-| `config/experimental_design.csv` | Maps each raw file to its `Cleanup` / `Resuspension` condition and an `Include` flag. |
-
-Selection mirrors `shared_proteoforms.py`:
-
-* **Proteoform identity** = `ChemicalProteoformId` (sequence + modifications + mass).
-* **"Identified"** = has a PrSM-level (q-value ≤ 0.01) hit in that condition's file(s).
-* Conditions and their left-to-right order, colours and bead-type grouping are
-  set by the `CONDITIONS` list (all nine included files: MCW, then the MagReSyn
-  and Cytiva resuspension series).
+Conditions and their left-to-right order, colours and bead-type grouping are set
+by the `CONDITIONS` list (all nine included files: MCW, then the MagReSyn and
+Cytiva resuspension series).
 
 ### Outputs
-
-Written to `results/` (figures to `results/figures/`, tables to `results/tables/`):
 
 | File | Description |
 | ---- | ----------- |
@@ -145,7 +226,7 @@ conda run -n tdms python src/identification/proteoform_physiochemical_props.py
 
 ---
 
-## Script 1b — `physiochemical_stats.py`
+## Testing properties by cleanup method (`physiochemical_stats.py`)
 
 Tests whether the property distributions (average mass, pI, GRAVY) **vary by
 cleanup method**, reusing the exact FDR-confident dataset assembled by
@@ -182,7 +263,7 @@ conda run -n tdms python src/identification/physiochemical_stats.py
 
 ---
 
-## Script 2 — `shared_proteoforms.py`
+## Shared proteoforms across conditions (`shared_proteoforms.py`)
 
 Compares the `kelleher_negLog_pScore` of proteoforms that are identified across a
 chosen set of sample-cleanup conditions, using a ProSightPD `.tdReport` (a SQLite
@@ -206,22 +287,14 @@ Key analysis decisions (see the module docstring for details):
 
 ### Inputs
 
-The two inputs (paths relative to the repository root):
-
-| File | Description |
-| ---- | ----------- |
-| `data/20250723_ifeltens_SP3_TDP_annotated_subsequence_2.tdReport` | ProSightPD report (SQLite). **Not included in the repository** — supply your own. |
-| `config/experimental_design.csv` | Maps each raw file to its `Cleanup` / `Resuspension` condition and an `Include` flag. |
-
-`experimental_design.csv` has columns `Name, Cleanup, Resuspension, Include`. Rows
-with `Include == FALSE` (e.g. files acquired with a different method) are dropped.
-
-To compare different conditions, edit the `CONDITIONS_OF_INTEREST` list in the
-script.
+Uses the shared inputs — the `.tdReport` in `data/` and
+`config/experimental_design.csv` (see [Repository layout](#repository-layout) and
+[`data/README.md`](data/README.md)). The design has columns
+`Name, Cleanup, Resuspension, Include`; rows with `Include == FALSE` (e.g. files
+acquired with a different method) are dropped. To compare different conditions,
+edit the `CONDITIONS_OF_INTEREST` list in the script.
 
 ### Outputs
-
-Written to `results/` (figures to `results/figures/`, tables to `results/tables/`):
 
 | File | Description |
 | ---- | ----------- |
@@ -325,23 +398,11 @@ unexplained fraction (with a threshold sensitivity sweep). Outputs
 ### Running
 
 ```bash
-conda run -n tdms python src/deconvolution/filter_features.py        # write confident _conf.tsv
-# (re-run MSTopDiff on data/flashdeconv/filtered/*_conf.tsv -> data/flashdeconv/mstopdiff/)
+# confident features come from filter_features.py (deconvolution pipeline);
+# run MSTopDiff (GUI) on data/flashdeconv/filtered/*_conf.tsv -> data/flashdeconv/mstopdiff/
 conda run -n tdms python src/modifications/mstopdiff_compare.py
 conda run -n tdms python src/modifications/mstopdiff_unannotated.py
 ```
-
----
-
-## Dependencies
-
-* pandas
-* numpy
-* scipy
-* matplotlib
-* seaborn
-* matplotlib-venn
-* Biopython (`Bio.SeqUtils.ProtParam.ProteinAnalysis`)
 
 ---
 
