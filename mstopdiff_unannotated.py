@@ -183,6 +183,10 @@ def main():
     summ_rows, all_unannot = [], []
     for cond, df in data.items():
         row, pk = summarize(df, expl, sat, REL_THRESH)
+        if row is None:
+            print(f"  WARNING: no peaks >= {REL_THRESH:.0%} of base peak in "
+                  f"{cond}; skipped")
+            continue
         row = {"condition": cond, **row}
         summ_rows.append(row)
         una = pk[pk["class"] == "unannotated"].copy()

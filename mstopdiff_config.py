@@ -10,6 +10,7 @@ Run MSTopDiff on flashdeconv/filtered/<stem>_conf.tsv and drop the resulting
 script picks it up automatically.
 """
 import os
+import sys
 import glob
 import pandas as pd
 
@@ -44,17 +45,32 @@ PUBLICATION = [("MCW", "5% ACN, 0.1% FA"),
 def _design():
     d = pd.read_csv(DESIGN)
     d["stem"] = d["Name"].str.replace(r"\.raw$", "", regex=True)
-    return d.set_index("stem")
+    return d.set_index("stem", verify_integrity=True)
+
+
+def _included(v):
+    """Interpret the experimental_design Include flag (TRUE/FALSE strings)."""
+    return str(v).strip().upper() not in ("FALSE", "0", "NO", "N", "NAN", "")
 
 
 def discover():
-    """Return ordered list of dataset dicts for every CSV present."""
+    """Return ordered list of dataset dicts for every included CSV present.
+
+    CSVs whose stem is absent from experimental_design.csv, or whose Include
+    flag is FALSE, are skipped with a warning to stderr (so a misnamed/renamed
+    file is never silently dropped).
+    """
     design = _design()
     fam_rank = {"MCW": 0, "Cytiva Carboxyl": 1, "MagReSyn Hydroxyl": 2}
-    out = []
-    for path in glob.glob(os.path.join(MSTOPDIFF_DIR, "*_conf_mstopdiff.csv")):
+    out, skipped = [], []
+    for path in sorted(glob.glob(os.path.join(MSTOPDIFF_DIR,
+                                              "*_conf_mstopdiff.csv"))):
         stem = os.path.basename(path)[:-len("_conf_mstopdiff.csv")]
         if stem not in design.index:
+            skipped.append((stem, "no matching row in experimental_design.csv"))
+            continue
+        if not _included(design.loc[stem, "Include"]):
+            skipped.append((stem, "Include=FALSE"))
             continue
         cleanup = design.loc[stem, "Cleanup"]
         resusp = design.loc[stem, "Resuspension"]
@@ -65,6 +81,9 @@ def discover():
             "label": label, "color": COLOR.get((cleanup, resusp), "#777777"),
             "is_pub": (cleanup, resusp) in PUBLICATION,
         })
+    for stem, why in skipped:
+        print(f"[mstopdiff_config] skipped {stem}_conf_mstopdiff.csv: {why}",
+              file=sys.stderr)
     rr = {r: i for i, r in enumerate(RESUSP_ORDER)}
     out.sort(key=lambda d: (fam_rank.get(d["cleanup"], 9),
                             rr.get(d["resusp"], 9)))

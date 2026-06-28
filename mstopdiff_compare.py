@@ -1,30 +1,34 @@
 """
-Compare MSTopDiff delta-mass histograms across three sample-cleanup conditions
-and annotate common top-down mass shifts.
+Build the MSTopDiff modification figures for the sample-cleanup comparison.
+
+Datasets are auto-discovered via mstopdiff_config from the confident-mass
+MSTopDiff exports (flashdeconv/mstopdiff/*_conf_mstopdiff.csv; columns bin,
+count, intensity_lower_mass, intensity_higher_mass, and the "... x count"
+variants, 0.01 Da bins). We use the intensity x count signal (the count trace
+is dominated by per-condition baseline offsets and is uninformative here).
 
 MSTopDiff parameters used to make the inputs:
   Mass feature filter 0-100 kDa | RT 0-60 min | delta mass 0-150 Da
   RT window 2 min | max charge difference 2 | bin size 0.01 Da
 
-Because each file holds only a few hundred features, the 0.01 Da histogram is
-dominated by combinatorial background (~25-35 pairs/bin). So instead of
-untargeted peak-picking we:
-  (1) rebin to 0.1 Da for a readable overlay, and
-  (2) for each candidate modification, sum the signal in a +/-0.05 Da window
-      and compute ENRICHMENT over the local background (median of flanking
-      bins). Enrichment is condition-internal, so it is directly comparable
-      across conditions despite their different total pair counts.
-
-We focus on the intensity x count signal (count is dominated by per-condition
-baseline offsets and is uninformative here).
+Method:
+  * Histograms are single-sided (lower-mass partner; the higher-mass partner is
+    a near-mirror and redundant), rebinned to 0.1 Da and shown over 0-XMAX Da,
+    each normalised to its own base peak (relative intensity).
+  * Per-modification relative abundance = tallest intensity x count bin within
+    +/-0.05 Da of the mod mass, divided by the dataset's base peak (0-XMAX Da).
+    This is condition-internal, so it is comparable across the sparse
+    confident-mass histograms without a local-background estimate.
 
 Outputs:
-  fig_mstopdiff_ixc.{png,pdf}            - diverging intensity x count overlay
-                                           (lower above / higher below axis),
-                                           full 0-150 Da + annotated 0-60 zoom
-  fig_mstopdiff_mod_enrichment.{png,pdf} - grouped bars of intensity x count
-                                           enrichment (log x)
-  mstopdiff_mod_table.csv                - per-mod, per-condition stats
+  fig_mstopdiff_ixc.{png,pdf}            - stacked histograms, publication subset
+  fig_mstopdiff_ixc_all.{png,pdf}        - stacked histograms, all datasets
+  fig_mstopdiff_mod_heatmap.{png,pdf}    - modification x dataset relative-
+                                           abundance heatmap (all datasets)
+  fig_mstopdiff_mod_enrichment.{png,pdf} - relative-abundance bars (publication
+                                           subset; filename kept for continuity)
+  mstopdiff_mod_table.csv                - relative abundance (% of base peak)
+                                           per modification per dataset
 """
 
 import os
@@ -114,16 +118,15 @@ def load(path):
 def rebin(df, factor=10):
     """Sum 0.01 Da bins into coarser bins (factor=10 -> 0.1 Da).
 
-    Returns bin starts, count, and the signed intensity x count partners
-    (lower >= 0, higher <= 0) for the faithful diverging MSTopDiff plot.
+    Returns coarse bin starts and the summed lower-mass-partner intensity x
+    count (single-sided). Assumes bins are contiguous and start at 0.0 (true
+    for MSTopDiff exports); only the figure x-axis relies on this.
     """
     n = (len(df) // factor) * factor
-    rs = lambda s: df[s].to_numpy()[:n].reshape(-1, factor).sum(1)
     binc = df["bin"].to_numpy()[:n].reshape(-1, factor)[:, 0]
-    cnt = rs("count")
-    ixc_lo = rs("intensity_lower_mass x count")   # >= 0
-    ixc_hi = rs("intensity_higher_mass x count")  # <= 0
-    return binc, cnt, ixc_lo, ixc_hi
+    ixc_lo = df["intensity_lower_mass x count"].to_numpy()[:n].reshape(
+        -1, factor).sum(1)
+    return binc, ixc_lo
 
 
 def window_peak(df, mass, col):
@@ -148,7 +151,7 @@ def stacked_figure(dsets, outname, height_per=3.4):
                              sharex=True, sharey=True)
     axes = np.atleast_1d(axes)
     for ax, d in zip(axes, dsets):
-        bx, cnt, ixc_lo, ixc_hi = rebin(d["df"])
+        bx, ixc_lo = rebin(d["df"])
         peak = ixc_lo[bx <= XMAX].max()
         ax.plot(bx, ixc_lo / peak if peak else ixc_lo, color=d["color"], lw=0.8)
         ax.set_xlim(0, XMAX)
