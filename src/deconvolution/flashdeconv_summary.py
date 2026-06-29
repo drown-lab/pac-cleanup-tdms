@@ -42,13 +42,77 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
+# Arial (matches the other figure scripts; the default DejaVu Sans is not
+# available in Illustrator) and embed TrueType (Type 42) so PDF text stays
+# editable words rather than individually-placed glyphs (the Type 3 default).
+plt.rcParams["font.family"] = "sans-serif"
+plt.rcParams["font.sans-serif"] = ["Arial"]
+plt.rcParams["axes.unicode_minus"] = False
+plt.rcParams["pdf.fonttype"] = 42
+plt.rcParams["ps.fonttype"] = 42
+
+FIG_EXTS = ("png", "pdf")  # raster preview + editable vector
+
 # Repo layout: this script lives in src/deconvolution/, so the project root is
 # two levels up. Inputs default to data/flashdeconv/; figures go to
 # results/figures/ and the summary table to results/tables/.
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_INPUT_DIR = ROOT / "data" / "flashdeconv"
+DESIGN = ROOT / "config" / "experimental_design.csv"
 FIGURES_DIR = ROOT / "results" / "figures"
 TABLES_DIR = ROOT / "results" / "tables"
+
+# Short cleanup names for figure labels (full names live in experimental_design.csv).
+CLEANUP_SHORT = {"Cytiva Carboxyl": "Cytiva", "MagReSyn Hydroxyl": "MagReSyn", "MCW": "MCW"}
+# Legend / plot order: MCW, then the MagReSyn series, then the Cytiva series;
+# within a bead type, by resuspension strength.
+BEAD_ORDER = {"MCW": 0, "MagReSyn Hydroxyl": 1, "Cytiva Carboxyl": 2}
+RESUS_ORDER = {"5% ACN, 0.1% FA": 0, "0.5% TFA": 1, "2% TFA": 2, "10% FA": 3, "20% FA": 4}
+
+
+def save_fig(fig, out_path: Path) -> None:
+    """Save a figure to every FIG_EXTS variant of out_path, then close it."""
+    for ext in FIG_EXTS:
+        fig.savefig(out_path.with_suffix(f".{ext}"), dpi=200)
+    plt.close(fig)
+
+
+def load_design(design_path: Path) -> dict[str, tuple[str, tuple[int, int]]]:
+    """Map each raw-file base name -> (human label, sort key) from the design,
+    e.g. `20250721_ifeltens_2_Cyt` -> ("Cytiva 2% TFA", (2, 2)); MCW -> ("MCW", (0, 0))."""
+    if not design_path.exists():
+        return {}
+    design = pd.read_csv(design_path)
+    meta: dict[str, tuple[str, tuple[int, int]]] = {}
+    for _, r in design.iterrows():
+        base = re.sub(r"\.raw$", "", str(r["Name"]))
+        cleanup = str(r["Cleanup"]).strip()
+        resus = str(r["Resuspension"]).strip()
+        short = CLEANUP_SHORT.get(cleanup, cleanup)
+        label = short if cleanup == "MCW" else f"{short} {resus}"
+        meta[base] = (label, (BEAD_ORDER.get(cleanup, 99), RESUS_ORDER.get(resus, 99)))
+    return meta
+
+
+def _match_base(path: Path, meta: dict) -> str | None:
+    """The design base whose name prefixes this TSV's stem (e.g. `<base>_ms1`)."""
+    stem = path.stem
+    for base in sorted(meta, key=len, reverse=True):
+        if stem == base or stem.startswith(base + "_"):
+            return base
+    return None
+
+
+def label_for(path: Path, meta: dict) -> str:
+    """Human label for a TSV; falls back to the file stem if no design match."""
+    base = _match_base(path, meta)
+    return meta[base][0] if base else path.stem
+
+
+def order_key(path: Path, meta: dict) -> tuple[int, int]:
+    """Sort key (bead, resuspension) for legend/plot order; unknowns sort last."""
+    base = _match_base(path, meta)
+    return meta[base][1] if base else (999, 999)
 
 # Canonical name -> candidate raw column names (matched after normalization).
 # Column spelling varies across FLASHDeconv builds, so we resolve by candidates
@@ -144,43 +208,44 @@ def yield_curve(path: Path, target_value: int, grid: np.ndarray) -> np.ndarray:
 
 
 def plot_qscore_distributions(
-    files: list[Path], target_value: int, out_path: Path
+    files: list[Path], target_value: int, out_path: Path, meta: dict
 ) -> None:
-    fig, ax = plt.subplots(figsize=(7, 4.5))
+    fig, ax = plt.subplots(figsize=(6, 6))
     bins = np.linspace(0, 1, 41)
     for path in files:
         df, cols = load_tsv(path)
         is_target = target_mask(df[cols["decoy"]], target_value)
         q = pd.to_numeric(df.loc[is_target, cols["qscore"]], errors="coerce").dropna()
-        ax.hist(q, bins=bins, histtype="step", linewidth=1.5, label=path.stem)
+        ax.hist(q, bins=bins, histtype="step", linewidth=1.5, label=label_for(path, meta))
     ax.set_xlabel("Qscore (target masses)")
     ax.set_ylabel("Mass count")
-    ax.set_title("Deconvolution score distribution by file")
+    ax.set_title("Deconvolution score distribution by condition")
     ax.legend(fontsize=7, frameon=False)
+    ax.set_box_aspect(1)          # 1:1 aspect ratio
     fig.tight_layout()
-    fig.savefig(out_path, dpi=200)
-    plt.close(fig)
+    save_fig(fig, out_path)
 
 
 def plot_yield_curves(
-    files: list[Path], target_value: int, out_path: Path
+    files: list[Path], target_value: int, out_path: Path, meta: dict
 ) -> None:
     grid = np.linspace(0.0, 0.20, 41)
-    fig, ax = plt.subplots(figsize=(7, 4.5))
+    fig, ax = plt.subplots(figsize=(6, 6))
     for path in files:
         counts = yield_curve(path, target_value, grid)
-        ax.plot(grid * 100, counts, linewidth=1.5, label=path.stem)
+        ax.plot(grid * 100, counts, linewidth=1.5, label=label_for(path, meta))
     ax.axvline(5, color="0.5", linestyle="--", linewidth=1)
     ax.set_xlabel("Deconvolution FDR threshold (%)")
     ax.set_ylabel("Confident target masses")
     ax.set_title("Confident-mass yield vs FDR threshold")
     ax.legend(fontsize=7, frameon=False)
+    ax.set_box_aspect(1)          # 1:1 aspect ratio
     fig.tight_layout()
-    fig.savefig(out_path, dpi=200)
-    plt.close(fig)
+    save_fig(fig, out_path)
 
 
-def plot_target_decoy(path: Path, target_value: int, out_path: Path) -> None:
+def plot_target_decoy(path: Path, target_value: int, out_path: Path,
+                      meta: dict) -> None:
     """Per-file target vs decoy Qscore step plot (the paper's key diagnostic)."""
     df, cols = load_tsv(path)
     is_target = target_mask(df[cols["decoy"]], target_value)
@@ -194,11 +259,10 @@ def plot_target_decoy(path: Path, target_value: int, out_path: Path) -> None:
         ax.hist(q, bins=bins, histtype="step", linewidth=1.6, label=label, color=color)
     ax.set_xlabel("Qscore")
     ax.set_ylabel("Mass count")
-    ax.set_title(path.stem)
+    ax.set_title(label_for(path, meta))
     ax.legend(frameon=False)
     fig.tight_layout()
-    fig.savefig(out_path, dpi=200)
-    plt.close(fig)
+    save_fig(fig, out_path)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -241,10 +305,13 @@ def main(argv: list[str] | None = None) -> int:
     print(f"\nWrote {csv_path}")
     print(summary.to_string(index=False))
 
-    ok_files = [f for f in files if f.stem in set(summary["file"])]
+    meta = load_design(DESIGN)
+    # order MCW -> MagReSyn series -> Cytiva series (drives legend/plot order)
+    ok_files = sorted((f for f in files if f.stem in set(summary["file"])),
+                      key=lambda f: order_key(f, meta))
 
-    plot_qscore_distributions(ok_files, args.target_value, FIGURES_DIR / "qscore_distributions.png")
-    plot_yield_curves(ok_files, args.target_value, FIGURES_DIR / "yield_vs_fdr.png")
+    plot_qscore_distributions(ok_files, args.target_value, FIGURES_DIR / "qscore_distributions.png", meta)
+    plot_yield_curves(ok_files, args.target_value, FIGURES_DIR / "yield_vs_fdr.png", meta)
     print(f"Wrote {FIGURES_DIR / 'qscore_distributions.png'}")
     print(f"Wrote {FIGURES_DIR / 'yield_vs_fdr.png'}")
 
@@ -252,7 +319,7 @@ def main(argv: list[str] | None = None) -> int:
         pf_dir = FIGURES_DIR / "flashdeconv_per_file"
         pf_dir.mkdir(exist_ok=True)
         for path in ok_files:
-            plot_target_decoy(path, args.target_value, pf_dir / f"{path.stem}_target_decoy.png")
+            plot_target_decoy(path, args.target_value, pf_dir / f"{path.stem}_target_decoy.png", meta)
         print(f"Wrote per-file target/decoy plots to {pf_dir}")
 
     return 0

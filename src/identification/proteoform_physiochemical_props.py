@@ -112,6 +112,10 @@ def style_matplotlib() -> None:
     plt.rcParams["font.family"] = "sans-serif"
     plt.rcParams["font.sans-serif"] = ["Arial"]
     plt.rcParams["axes.unicode_minus"] = False
+    # Embed TrueType (Type 42) so PDF text stays editable words in Illustrator,
+    # not individually-placed glyphs (matplotlib's Type 3 default).
+    plt.rcParams["pdf.fonttype"] = 42
+    plt.rcParams["ps.fonttype"] = 42
 
 
 def savefig(fig, stem) -> None:

@@ -32,6 +32,10 @@ plt.rcParams["font.family"] = "sans-serif"
 plt.rcParams["font.sans-serif"] = ["Arial"]
 plt.rcParams["axes.unicode_minus"] = False
 plt.rcParams["font.size"] = 13
+# Embed TrueType (Type 42) so PDF text stays editable words in Illustrator,
+# not individually-placed glyphs (matplotlib's Type 3 default).
+plt.rcParams["pdf.fonttype"] = 42
+plt.rcParams["ps.fonttype"] = 42
 
 import mstopdiff_config as cfg
 

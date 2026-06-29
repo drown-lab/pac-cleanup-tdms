@@ -256,6 +256,11 @@ def main() -> None:
 
     # ---- figures ------------------------------------------------------------
     sns.set_theme(style="whitegrid")
+    # Embed TrueType (Type 42) so PDF text stays editable words in Illustrator,
+    # not individually-placed glyphs (matplotlib's Type 3 default). Set after
+    # sns.set_theme so it is not overridden.
+    plt.rcParams["pdf.fonttype"] = 42
+    plt.rcParams["ps.fonttype"] = 42
     palette = sns.color_palette("Set2", n_cond)
 
     # (1) distribution per condition
